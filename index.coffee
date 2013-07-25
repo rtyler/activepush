@@ -4,12 +4,15 @@ path = require "path"
 http = require "http"
 express = require "express"
 socket_io = require "socket.io"
+merge = require "deepmerge"
 { Stomp } = require "stomp"
 { EventEmitter } = require "events"
 require "js-yaml"
 
-exports.loadConfiguration = (p) ->
-  require path.resolve(".", p)
+exports.loadConfiguration = (environment = "development") ->
+  deflt = require("#{__dirname}/config/default.yml") or {}
+  overlay = require("#{__dirname}/config/#{environment}.yml") or {}
+  merge deflt, overlay
 
 createSocketIOServer = (config, subscriptions) ->
   app = express()
@@ -81,5 +84,5 @@ exports.main = (config) ->
     createStompConnection(config, host, subscriptions)
 
 if require.main is module
-  config = exports.loadConfiguration(process.argv[2] or "./config.yml")
+  config = exports.loadConfiguration process.argv[2]
   exports.main config
