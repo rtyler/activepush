@@ -36,7 +36,7 @@ createSocketIOServer = (config, subscriptions) ->
         console.log "SOCKET.IO disconnect, removing listener:", push_id
         subscriptions.removeListener push_id, listener
 
-  [app, io]
+  { app, io, server }
 
 createStompConnection = (config, host, subscriptions) ->
   console.log "STOMP connecting to: #{host.host}:#{host.port}#{config.stomp.inbox}"
@@ -72,17 +72,26 @@ exports.stompPublish = (host, destination, push_id, message) ->
     , false
     stomp.disconnect()
 
-exports.main = (config) ->
+exports.start = (config, callback) ->
   # EventEmitter used to keep track of subscriptions
   subscriptions = new EventEmitter()
 
   # Create one Socket.io server
-  createSocketIOServer(config, subscriptions)
+  { app, io, server } = createSocketIOServer(config, subscriptions)
 
   # # Create one or more STOMP connections
-  for host in config.stomp.hosts
-    createStompConnection(config, host, subscriptions)
+  stomp = createStompConnection(config, config.stomp.hosts[0], subscriptions)
+
+  stomp.on "connected", ->
+    callback?(null)
+
+  stop: (callback) ->
+    console.log "Shutting down..."
+    stomp.disconnect()
+    server.close()
+    process.nextTick ->
+      callback?(null)
 
 if require.main is module
   config = exports.loadConfiguration process.argv[2]
-  exports.main config
+  exports.start config
