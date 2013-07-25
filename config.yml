@@ -1,4 +1,15 @@
-stomp_host: "localhost"
-stomp_port: 61613
-stomp_topic: "/topic/test_stomp"
-http_port: 8080
+stomp:
+  inbox: "/topic/activepush"
+  hosts:
+    - host: "localhost"
+      port: 61613
+      ssl: false
+      login: "guest"
+      passcode: "guest"
+
+logging:
+  level: "WARN"
+  file: "log/activepush.log"
+
+http:
+   port: 9191

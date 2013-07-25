@@ -1,5 +1,6 @@
 
 fs = require "fs"
+path = require "path"
 http = require "http"
 express = require "express"
 socket_io = require "socket.io"
@@ -7,61 +8,78 @@ socket_io = require "socket.io"
 { EventEmitter } = require "events"
 require "js-yaml"
 
-config = require "./config.yml"
+exports.loadConfiguration = (p) ->
+  require path.resolve(".", p)
 
-# Create STOMP client
-stomp = new Stomp
-  host: config.stomp_host
-  port: config.stomp_port
-  debug: false
-  login: "guest"
-  passcode: "guest"
+createSocketIOServer = (config, subscriptions) ->
+  app = express()
 
-# Create Socket.io and Express webserver
-app = express()
-server = http.createServer(app)
-io = socket_io.listen(server)
+  app.get "/", (req, res) ->
+    res.sendfile "#{__dirname}/demo.html"
 
-app.get "/", (req, res) ->
-  res.sendfile "#{__dirname}/demo.html"
+  server = http.createServer(app)
+  io = socket_io.listen(server)
+  server.listen(config.http.port)
+  console.log "SOCKET.IO listening on:", config.http.port
 
-server.listen config.http_port
-console.info "Listening on port #{config.http_port}"
+  io.sockets.on "connection", (socket) ->
+    console.log "SOCKET.IO connection"
+    socket.on "subscribe", (push_id) ->
+      console.log "SOCKET.IO subscribe:", push_id
+      listener = (data) ->
+        socket.emit "message", data
+      subscriptions.addListener push_id, listener
+      socket.on "disconnect", ->
+        console.log "SOCKET.IO disconnect, removing listener:", push_id
+        subscriptions.removeListener push_id, listener
 
-# EventEmitter used to keep track of subscriptions
-subscriptions = new EventEmitter()
+  [app, io]
 
-# STOMP
-stomp.connect()
-stomp.on "connected", ->
-  console.log "STOMP connection: #{config.stomp_host}:#{config.stomp_port}"
-  stomp.subscribe { destination: config.stomp_topic, ack: "client" }, (body, headers) ->
-    console.log body, headers
-    try
-      data = JSON.parse body[0]
-      console.log data
-      push_id = data.push_id #body[0]
-      message = data.message #body[0]
+createStompConnection = (config, host, subscriptions) ->
+  console.log "STOMP connecting to: #{host.host}:#{host.port}#{config.stomp.inbox}"
+
+  stomp = new Stomp host
+  stomp.connect()
+  stomp.on "connected", ->
+    console.log "STOMP connected: #{host.host}:#{host.port}#{config.stomp.inbox}"
+    stomp.subscribe { destination: config.stomp.inbox, ack: "client" }, (body, headers) ->
+      push_id = headers.push_id
+      message = body[0]
+      console.log "STOMP message:", push_id, message
       subscriptions.emit push_id, message
-    catch e
-      console.warn "error", e
-# stomp.on "message", (message) ->
-#   stomp.ack message.headers['message-id']
 
+  stomp.on "error", (error) ->
+    console.log "STOMP error:", error.body
+    # stomp.disconnect()
 
-stomp.on "error", (errorFrame) ->
-  # TODO: reconnect? exit?
-  console.error errorFrame.body
-  stomp.disconnect()
+  stomp.on "disconnected", (_) ->
+    console.log "STOMP disconnected: #{host.host}:#{host.port}"
 
-# Socket.io
-io.sockets.on "connection", (socket) ->
-  console.log "Socket.io connection."
-  socket.on "subscribe", (push_id) ->
-    console.log "subscribe to #{push_id}"
-    listener = (data) ->
-      socket.emit "message", data
-    subscriptions.addListener push_id, listener
-    socket.on "disconnect", ->
-      console.log "disconnect, removing listener for #{push_id}"
-      subscriptions.removeListener push_id, listener
+  stomp
+
+exports.stompPublish = (host, destination, push_id, message) ->
+  stomp = new Stomp host
+  stomp.connect()
+  stomp.on "connected", ->
+    stomp.send
+      destination: destination
+      push_id: push_id
+      body: message
+      persistent: false
+    , false
+    stomp.disconnect()
+
+exports.main = (config) ->
+  # EventEmitter used to keep track of subscriptions
+  subscriptions = new EventEmitter()
+
+  # Create one Socket.io server
+  createSocketIOServer(config, subscriptions)
+
+  # # Create one or more STOMP connections
+  for host in config.stomp.hosts
+    createStompConnection(config, host, subscriptions)
+
+if require.main is module
+  config = exports.loadConfiguration(process.argv[2] or "./config.yml")
+  exports.main config
