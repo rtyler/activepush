@@ -1,0 +1,4 @@
+stomp_host: "localhost"
+stomp_port: 61613
+stomp_topic: "/topic/test_stomp"
+http_port: 8080

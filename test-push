@@ -1,0 +1,39 @@
+#!/usr/bin/env coffee
+
+{ Stomp } = require "stomp"
+
+require "js-yaml"
+config = require "./config.yml"
+
+push_id = process.argv[2] or "demo"
+message = process.argv[3] or "hello world"
+
+receipt = false
+persistent = false
+
+stomp = new Stomp
+  host: config.stomp_host
+  port: config.stomp_port
+  debug: false
+  login: "guest"
+  passcode: "guest"
+
+stomp.connect()
+stomp.on "connected", ->
+  body = JSON.stringify
+    push_id: push_id
+    message: message
+
+  console.log "Sending to STOMP broker #{config.stomp_host}:#{config.stomp_port}"
+  console.log body
+
+  stomp.send
+    destination: config.stomp_topic
+    body: body
+    persistent: persistent
+  , receipt
+  stomp.disconnect()
+
+stomp.on "error", (error) ->
+  console.error error.body
+  stomp.disconnect()

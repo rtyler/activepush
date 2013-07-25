@@ -1,0 +1,32 @@
+<html>
+<head>
+  <title>ActivePush Demo Page</title>
+</head>
+<body>
+  <pre id="log"></pre>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    var push_id = window.location.hash.slice(1) || "demo"
+    window.location.hash = "#" + push_id;
+
+    var socket = io.connect("http://localhost");
+    socket.on("connect", function () {
+      console.log("connected");
+      socket.emit("subscribe", push_id);
+      console.log("subscribed to push_id:", push_id);
+    })
+    socket.on("message", function (data) {
+      console.log("message:", JSON.stringify(data, null, 2));
+    });
+
+    // Also pipe log to page for demo purposes
+    console._log = console.log;
+    console.log = function() {
+      console._log.apply(console, arguments);
+      document.getElementById("log").innerText += new Date() + ": " + Array.prototype.join.call(arguments, " ") + "\n";
+    }
+  </script>
+
+</body>
+</html>
