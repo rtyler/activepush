@@ -77,13 +77,20 @@ exports.stompPublish = (host, destination, push_id, message) ->
     stomp.disconnect()
 
 exports.start = (config, callback) ->
+  # Configure logging
+  if config.logging.file
+    winston.remove winston.transports.Console
+    winston.add winston.transports.File,
+      filename: config.logging.file
+  winston.level = (config.logging.level or "info").toLowerCase()
+
   # EventEmitter used to keep track of subscriptions
   subscriptions = new EventEmitter()
 
-  # Create one Socket.io server
+  # Create Socket.io server
   { app, io, server } = createSocketIOServer(config, subscriptions)
 
-  # # Create one or more STOMP connections
+  # Create STOMP connection
   stomp = createStompConnection(config, config.stomp.hosts[0], subscriptions)
 
   stomp.on "connected", ->
@@ -96,20 +103,8 @@ exports.start = (config, callback) ->
     process.nextTick ->
       callback?(null)
 
+exports.main = (args) ->
+  exports.start exports.loadConfiguration args[0]
+
 if require.main is module
-  # Get the configuration overlays
-  config = exports.loadConfiguration process.argv[2]
-
-  # Configure logging
-  winston.remove winston.transports.Console
-  logOptions =
-    level: (config.logging.level or "info").toLowerCase()
-  if config.logging.file
-    logOptions.filename = config.logging.file
-    winston.add winston.transports.File, logOptions
-  else
-    logOptions.colorize = true
-    winston.add winston.transports.Console, logOptions
-
-  # Start the server
-  exports.start config
+  exports.main process.argv[2..]

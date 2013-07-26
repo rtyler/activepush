@@ -1,2 +1,5 @@
 http:
   port: 6789
+
+logging:
+  file: null

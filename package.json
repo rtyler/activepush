@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/mocha --compilers coffee:coffee-script test"
+    "start": "node_modules/.bin/coffee index.coffee",
+    "test": "node_modules/.bin/mocha --compilers coffee:coffee-script test"
   },
   "repository": "",
   "author": "",
@@ -24,6 +25,7 @@
     "chai": "~1.7.2",
     "chai-as-promised": "~3.3.1",
     "q": "~0.9.6",
-    "socket.io-client": "~0.9.16"
+    "socket.io-client": "~0.9.16",
+    "node-uuid": "~1.4.0"
   }
 }
