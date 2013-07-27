@@ -5,11 +5,9 @@ http = require "http"
 express = require "express"
 socket_io = require "socket.io"
 merge = require "deepmerge"
+logger = require "winston"
 { Stomp } = require "stomp"
 { EventEmitter } = require "events"
-
-winston = require "winston"
-
 require "js-yaml"
 
 exports.loadConfiguration = (environment = "development") ->
@@ -19,50 +17,77 @@ exports.loadConfiguration = (environment = "development") ->
 
 createSocketIOServer = (config, subscriptions) ->
   app = express()
-
-  app.get "/", (req, res) ->
-    res.sendfile "#{__dirname}/demo.html"
-
-  server = http.createServer(app)
+  server = http.createServer app
   io = socket_io.listen server, log: false
-  server.listen(config.http.port)
-  winston.info "SOCKET.IO listening on port %s", config.http.port
+  server.listen config.http.port
+  logger.info "SOCKET.IO listening on port %s", config.http.port
 
   io.sockets.on "connection", (socket) ->
-    winston.debug "SOCKET.IO connection"
+    logger.debug "SOCKET.IO connection"
     socket.on "error", (error) ->
-      winston.warn "SOCKET.IO error: %s", error
+      logger.warn "SOCKET.IO error: %s", error
     socket.on "subscribe", (push_id) ->
-      winston.info "SOCKET.IO subscribed: %s", push_id
+      logger.info "SOCKET.IO subscribed: %s", push_id
       listener = (message) ->
-        winston.debug "SOCKET.IO emit push_id=%s message=%s", push_id, message
-        socket.emit "message", message
+        logger.debug "SOCKET.IO send push_id=%s message=%s", push_id, message
+        socket.send message
       subscriptions.addListener push_id, listener
       socket.on "disconnect", ->
-        winston.info "SOCKET.IO disconnected: %s", push_id
+        logger.info "SOCKET.IO disconnected: %s", push_id
         subscriptions.removeListener push_id, listener
 
   { app, io, server }
 
-createStompConnection = (config, host, subscriptions) ->
-  stomp = new Stomp host
+createStompConnection = (config, subscriptions) ->
+  host = config.stomp.hosts[0]
+  stomp = new ReconnectingStomp host
   stomp.connect()
   stomp.on "connected", ->
-    winston.info "STOMP connected: %s:%s%s", host.host, host.port, config.stomp.inbox
+    logger.info "STOMP connected: %s:%s%s", host.host, host.port, config.stomp.inbox
     stomp.subscribe { destination: config.stomp.inbox, ack: "client" }, (body, headers) ->
       push_id = headers.push_id
       message = body[0]
-      # winston.trace "STOMP receive push_id=%s message=%s", push_id, message
+      # logger.trace "STOMP receive push_id=%s message=%s", push_id, message
       subscriptions.emit push_id, message
 
   stomp.on "error", (error) ->
-    winston.error "STOMP error: %s", error.body
+    logger.error "STOMP error: %s", error
     # stomp.disconnect()
 
   stomp.on "disconnected", (_) ->
-    winston.error "STOMP disconnected: %s:%s", host.host, host.port
+    logger.error "STOMP disconnected: %s:%s", host.host, host.port
 
   stomp
+
+createHealthEndpoint = (config, stomp, io, subscriptions) ->
+  (req, res) ->
+    res.json
+      stomp:
+        host: stomp.host
+        port: stomp.port
+      http:
+        port: config.http.port
+      metrics:
+        running: true
+        log:
+          enabled: true
+          level: config.logging.level
+          filename: config.logging.file
+        subscriptions: getSubscriptionsMetrics(subscriptions)
+        connections: getConnectionsMetrics(io)
+
+getConnectionsMetrics = (io) ->
+  count: io.sockets.clients().length
+
+getSubscriptionsMetrics = (subscriptions) ->
+  stats =
+    push_ids: {}
+    total: 0
+  for name, value of subscriptions._events
+    count = if Array.isArray(value) then value.length else 1
+    stats.push_ids[name] = count
+    stats.total += count
+  stats
 
 exports.stompPublish = (host, destination, push_id, message) ->
   stomp = new Stomp host
@@ -75,14 +100,16 @@ exports.stompPublish = (host, destination, push_id, message) ->
       persistent: false
     , false
     stomp.disconnect()
+  stomp.on "error", (error) ->
+    console.warn "stompPublish error", error
 
 exports.start = (config, callback) ->
   # Configure logging
   if config.logging.file
-    winston.remove winston.transports.Console
-    winston.add winston.transports.File,
+    logger.remove logger.transports.Console
+    logger.add logger.transports.File,
       filename: config.logging.file
-  winston.level = (config.logging.level or "info").toLowerCase()
+  logger.level = (config.logging.level or "info").toLowerCase()
 
   # EventEmitter used to keep track of subscriptions
   subscriptions = new EventEmitter()
@@ -91,13 +118,23 @@ exports.start = (config, callback) ->
   { app, io, server } = createSocketIOServer(config, subscriptions)
 
   # Create STOMP connection
-  stomp = createStompConnection(config, config.stomp.hosts[0], subscriptions)
+  stomp = createStompConnection(config, subscriptions)
+
+  # Health endpoint
+  app.get "/health", createHealthEndpoint(config, stomp, io, subscriptions)
+
+  # Demo page and sending endpoint.
+  app.get "/", (req, res) ->
+    res.sendfile "#{__dirname}/demo.html"
+  app.post "/send", express.json(), (req, res) ->
+    exports.stompPublish stomp, config.stomp.inbox, req.body.push_id, req.body.message
+    res.send 200
 
   stomp.on "connected", ->
     callback?(null)
 
   stop: (callback) ->
-    winston.info "Shutting down..."
+    logger.info "Shutting down..."
     stomp.disconnect()
     server.close()
     process.nextTick ->
@@ -105,6 +142,39 @@ exports.start = (config, callback) ->
 
 exports.main = (args) ->
   exports.start exports.loadConfiguration args[0]
+
+# Subclass of Stomp that automatically tries to reconnect, similar options to Ruby STOMP gem
+class ReconnectingStomp extends Stomp
+  constructor: (args) ->
+    Stomp.call @, args
+
+    @initial_reconnect_delay  = args.initial_reconnect_delay or 1
+    @max_reconnect_delay      = args.max_reconnect_delay or 30.0
+    @use_exponential_back_off = if args.use_exponential_back_off? then args.use_exponential_back_off else true
+    @back_off_multiplier      = args.back_off_multiplier or 2
+    @max_reconnect_attempts   = args.max_reconnect_attempts or 0
+
+    @_resetReconnection()
+    @on "connected", @_resetReconnection
+    @on "disconnected", @_reconnect
+
+  _reconnect: =>
+    if @reconnectTimer?
+      return
+    if @max_reconnect_attempts > 0 and @reconnectCount >= @max_reconnect_attempts
+      return
+    if @use_exponential_back_off
+      @reconnectDelay = Math.min(@max_reconnect_delay * 1000, @reconnectDelay * @back_off_multiplier)
+    @reconnectTimer = setTimeout =>
+      @max_reconnect_attempts++
+      @connect()
+      delete @reconnectTimer
+    , @reconnectDelay
+
+  _resetReconnection: =>
+    @reconnectCount = 0
+    @reconnectTimer = null
+    @reconnectDelay = @initial_reconnect_delay * 1000
 
 if require.main is module
   exports.main process.argv[2..]

@@ -3,6 +3,15 @@
   <title>ActivePush Demo Page</title>
 </head>
 <body>
+
+  <div>
+    <label for="push-id">push id:</label>
+    <input type="text" name="push-id" id="push-id" value="">
+    <label for="message">message:</label>
+    <input type="text" name="message" id="message" value="hello world">
+    <input type="submit" id="send" value="Send">
+  </div>
+  <hr>
   <pre id="log"></pre>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -10,6 +19,7 @@
     var push_id = window.location.hash.slice(1) || "demo"
     window.location.hash = "#" + push_id;
 
+    // Sample client
     var socket = io.connect("http://localhost");
     socket.on("connect", function () {
       console.log("connected");
@@ -25,6 +35,18 @@
     socket.on("message", function (data) {
       console.log("message:", JSON.stringify(data, null, 2));
     });
+
+    // Demo form
+    document.getElementById("push-id").value = push_id;
+    document.getElementById("send").onclick = function() {
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", "send");
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.send(JSON.stringify({
+        push_id: document.getElementById("push-id").value,
+        message: document.getElementById("message").value
+      }));
+    }
 
     // Also pipe log to page for demo purposes
     console._log = console.log;
