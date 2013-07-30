@@ -27,6 +27,9 @@
       console.log("connected");
       socket.emit("subscribe", push_id);
       console.log("subscribed to push_id:", push_id);
+
+      // Used in integration tests:
+      window.messages = [];
     });
     socket.on("disconnect", function () {
       console.log("disconnected");
@@ -35,6 +38,7 @@
       console.log("error", error);
     });
     socket.on("message", function (data) {
+      messages.push(data)
       console.log("message:", JSON.stringify(data, null, 2));
     });
 
@@ -67,7 +71,7 @@
     console._log = console.log;
     console.log = function() {
       console._log.apply(console, arguments);
-      document.getElementById("log").innerText += new Date() + ": " + Array.prototype.join.call(arguments, " ") + "\n";
+      document.getElementById("log").textContent += new Date() + ": " + Array.prototype.join.call(arguments, " ") + "\n";
     }
   </script>
 

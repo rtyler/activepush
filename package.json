@@ -27,6 +27,9 @@
     "chai-as-promised": "~3.3.1",
     "q": "~0.9.6",
     "socket.io-client": "~0.9.16",
-    "node-uuid": "~1.4.0"
+    "node-uuid": "~1.4.0",
+    "q-step": "0.0.1",
+    "wd": "0.0.33",
+    "q-proxy": "0.0.1"
   }
 }
