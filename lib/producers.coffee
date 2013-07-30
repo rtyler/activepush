@@ -1,6 +1,7 @@
 
 Q = require "q"
 Producer = require("./common").Module
+merge = require "deepmerge"
 
 # Library #1: stomp
 { Stomp } = require "stomp"
@@ -122,21 +123,23 @@ class StompitProducer extends Producer
     inbox: @options.inbox
 
   publish: (push_id, message) ->
-    @stomp.send(
+    frame = @stomp.send(
       destination: @options.inbox
       push_id: push_id
       persistent: false
-    ).end(message)
+    )
+    Q.ninvoke(frame, "end", message)
 
 StompitProducer.publish = (options, push_id, message) ->
   console.log "options", options
   stomp = new StompitProducer options
   stomp.start().then ->
     stomp.publish(push_id, message)
+  .then ->
     stomp.stop()
 
 # Default to one of the two:
-# StompProducer = NodeStompProducer
-StompProducer = StompitProducer
+StompProducer = NodeStompProducer
+# StompProducer = StompitProducer
 
 module.exports = { Producer, StompProducer }

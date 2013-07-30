@@ -9,10 +9,11 @@ integration = require "./integration-common"
 # HACK: Delay before checking received messages to ensure all messages get delivered.
 # Increase this value if tests are failiing non-deterministically.
 # TODO: better way to detect all messages have been delivered?
-WAIT_TIME = 500
+WAIT_TIME = 200
 
-DEFAULT_BROWSER =
-  browserName: "firefox"
+DEFAULT_CONFIG =
+  browser:
+    browserName: "firefox"
 
 LOCAL_CONFIG =
   host: "localhost"
@@ -24,10 +25,13 @@ SAUCE_CONFIG =
   username: process.env["SAUCE_USER"]
   password: process.env["SAUCE_KEY"]
 
-DEFAULT_CONFIG = LOCAL_CONFIG
+if process.env["SAUCE_USER"]?
+  CONFIG = merge(DEFAULT_CONFIG, SAUCE_CONFIG)
+else
+  CONFIG = merge(DEFAULT_CONFIG, LOCAL_CONFIG)
 
 exports.initIntegrationTests = (config = {}) ->
-  config = merge(DEFAULT_CONFIG, config)
+  config = merge(CONFIG, config)
 
   integration.initIntegrationTests
     name: "webdriver-#{config.browser.browserName}"

@@ -1,15 +1,15 @@
 {
-  "name": "web-push",
+  "name": "activepush",
   "version": "0.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "index.coffee",
   "scripts": {
     "start": "node_modules/.bin/coffee index.coffee",
     "test": "node_modules/.bin/mocha --compilers coffee:coffee-script test"
   },
-  "repository": "",
-  "author": "",
-  "license": " ",
+  "repository": "git://github.com:lookout/activepush.git",
+  "author": "Lookout (https://www.lookout.com/)",
+  "license": "MIT",
   "dependencies": {
     "coffee-script": "~1.6.3",
     "socket.io": "~0.9.16",
@@ -26,10 +26,11 @@
     "chai": "~1.7.2",
     "chai-as-promised": "~3.3.1",
     "q": "~0.9.6",
-    "socket.io-client": "~0.9.16",
-    "node-uuid": "~1.4.0",
     "q-step": "0.0.1",
-    "wd": "0.0.33",
-    "q-proxy": "0.0.1"
-  }
+    "q-proxy": "0.0.1",
+    "node-uuid": "~1.4.0",
+    "socket.io-client": "~0.9.16",
+    "wd": "0.0.33"
+  },
+  "private": true
 }

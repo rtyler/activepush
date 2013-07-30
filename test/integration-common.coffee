@@ -7,6 +7,7 @@ chai.use require "chai-as-promised"
 Q = require "q"
 merge = require "deepmerge"
 uuid = require "node-uuid"
+QStep = require "q-step"
 
 activepush = require "../index"
 { ActivePush } = activepush
@@ -37,37 +38,54 @@ exports.initIntegrationTests = (options) ->
 
     it "should not buffer messages (treat as transient)", ->
       expected = uniqueMessage("NO")
-      server.producer.publish "my_push_id", expected
-      createClient(server.config.http.port, "my_push_id").then (getMessages) ->
-        getMessages().then (receivedMessages) ->
-          expect(receivedMessages).to.deep.equal []
+      QStep(
+        () -> server.producer.publish "my_push_id", expected
+        () -> createClient server.config.http.port, "my_push_id"
+        (getMessages) -> getMessages()
+        (receivedMessages) -> expect(receivedMessages).to.deep.equal []
+      )
 
     it "should relay the correct messages to a single client", ->
       expected = uniqueMessage("YES")
-      createClient(server.config.http.port, "my_push_id").then (getMessages) ->
-        server.producer.publish "my_push_id", expected
-        server.producer.publish "other_push_id", uniqueMessage("NO")
-        getMessages().then (receivedMessages) ->
-          expect(receivedMessages).to.deep.equal [expected]
+      QStep(
+        () -> createClient server.config.http.port, "my_push_id"
+        (getMessages) ->
+          @getMessages = getMessages
+          Q.all [
+            server.producer.publish "my_push_id", expected
+            server.producer.publish "other_push_id", uniqueMessage("NO")
+          ]
+        () -> @getMessages()
+        (receivedMessages) -> expect(receivedMessages).to.deep.equal [expected]
+      )
 
     it "should relay the correct messages to multiple clients", (done) ->
       expected = uniqueMessage("YES")
-      Q.all(for index in [0..1]
-        createClient(server.config.http.port, "my_push_id")
-      ).then (allGetMessages) ->
-        server.producer.publish "my_push_id", expected
-        server.producer.publish "other_push_id", uniqueMessage("NO")
-        Q.all(getMessages() for getMessages in allGetMessages).then (allReceivedMessages) ->
-          expect(allReceivedMessages).to.deep.equal [[expected], [expected]]
+      QStep(
+        () -> Q.all(createClient(server.config.http.port, "my_push_id") for index in [0..1])
+        (allGetMessages) ->
+          @allGetMessages = allGetMessages
+          Q.all [
+            server.producer.publish "my_push_id", expected
+            server.producer.publish "other_push_id", uniqueMessage("NO")
+          ]
+        () -> Q.all(getMessages() for getMessages in @allGetMessages)
+        (allReceivedMessages) -> expect(allReceivedMessages).to.deep.equal [[expected], [expected]]
+      )
 
     it "should relay multiple messages when using XHR transport", ->
       expected = uniqueMessage("YES")
-      # FIXME: figure out how to get rid of this delay
-      createClient(server.config.http.port, "my_push_id", transports: ["xhr-polling"], 'try multiple transports': false).delay(1000).then (getMessages) ->
-        server.producer.publish "my_push_id", expected
-        server.producer.publish "my_push_id", expected
-        getMessages().then (receivedMessages) ->
-          expect(receivedMessages).to.deep.equal [expected, expected]
+      QStep(
+        () -> createClient(server.config.http.port, "my_push_id", transports: ["xhr-polling"], 'try multiple transports': false)
+        (getMessages) ->
+          @getMessages = getMessages
+          Q.all [
+            server.producer.publish "my_push_id", expected
+            server.producer.publish "my_push_id", expected
+          ]
+        () -> @getMessages()
+        (receivedMessages) -> expect(receivedMessages).to.deep.equal [expected, expected]
+      )
 
   describe "Multiple ActivePush instances (#{name})", ->
     @timeout TIMEOUT
@@ -87,18 +105,22 @@ exports.initIntegrationTests = (options) ->
       Q.all(server.stop() for server in servers)
 
     it "should relay the correct messages to multiple clients", (done) ->
-      Q.all(for server in servers
-        createClient(server.config.http.port, "my_push_id")
-      ).then (allGetMessages) ->
-        expected = for server, index in servers
-          msg = uniqueMessage("YES#{index}")
-          server.producer.publish "my_push_id", msg
-          server.producer.publish "other_push_id", uniqueMessage("NO")
-          msg
-        Q.all(getMessages() for getMessages in allGetMessages).then (allReceivedMessages) ->
+      QStep(
+        () -> Q.all(createClient(server.config.http.port, "my_push_id") for server in servers)
+        (allGetMessages) ->
+          @allGetMessages = allGetMessages
+          promises = []
+          @expected = for server, index in servers
+            promises.push server.producer.publish "my_push_id", (msg = uniqueMessage("YES#{index}"))
+            promises.push server.producer.publish "other_push_id", uniqueMessage("NO")
+            msg
+          Q.all(promises)
+        () -> Q.all(getMessages() for getMessages in @allGetMessages)
+        (allReceivedMessages) ->
           allReceivedMessages = (messages.sort() for messages in allReceivedMessages)
-          allExpectedMessages = (expected.sort() for messages in allReceivedMessages)
+          allExpectedMessages = (@expected.sort() for messages in allReceivedMessages)
           expect(allReceivedMessages).to.deep.equal allExpectedMessages
+      )
 
 uniqueInbox = ->
   "/topic/activepush-test-"+uuid.v1()

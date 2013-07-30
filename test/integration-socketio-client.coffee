@@ -8,7 +8,7 @@ integration = require "./integration-common"
 # HACK: Delay before checking received messages to ensure all messages get delivered.
 # Increase this value if tests are failiing non-deterministically.
 # TODO: better way to detect all messages have been delivered?
-WAIT_TIME = 200
+WAIT_TIME = 100
 
 exports.initIntegrationTests = ->
 
@@ -26,6 +26,10 @@ exports.initIntegrationTests = ->
           messages.push message
         deferred.resolve ->
           Q.delay(WAIT_TIME).then -> messages
-      deferred.promise
+      # FIXME: figure out how to remove this delay (only required when using the XHR transport)
+      if socket.socket.options.transports[0] is "xhr-polling" and socket.socket.options.transports.length is 1
+        deferred.promise.delay(100)
+      else
+        deferred.promise
 
 exports.initIntegrationTests()
