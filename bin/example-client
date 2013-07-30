@@ -1,11 +1,12 @@
 #!/usr/bin/env coffee
 
-activepush = require "../index"
+config = require "../lib/config"
+{ StompProducer } = require "../lib/producers"
 
-config = activepush.loadConfiguration process.argv[2]
+configuration = config.loadConfiguration process.argv[2]
 push_id = process.argv[3] or "demo"
 message = process.argv[4] or "hello world"
 
-console.log { config, push_id, message }
+console.log { configuration, push_id, message }
 
-activepush.stompPublish config.stomp.hosts[0], config.stomp.inbox, push_id, message
+StompProducer.publish configuration.stomp.hosts[0], configuration.stomp.inbox, push_id, message

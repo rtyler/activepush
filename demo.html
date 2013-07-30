@@ -13,6 +13,8 @@
   </div>
   <hr>
   <pre id="log"></pre>
+  <hr>
+  <pre id="health"></pre>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -47,6 +49,19 @@
         message: document.getElementById("message").value
       }));
     }
+
+    // Auto-refresh /health
+    health = document.getElementById("health");
+    setInterval(function() {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/health");
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          health.innerText = xhr.responseText;
+        }
+      }
+      xhr.send();
+    }, 1000)
 
     // Also pipe log to page for demo purposes
     console._log = console.log;
