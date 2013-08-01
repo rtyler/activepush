@@ -8,7 +8,7 @@ integration = require "./integration-common"
 # HACK: Delay before checking received messages to ensure all messages get delivered.
 # Increase this value if tests are failiing non-deterministically.
 # TODO: better way to detect all messages have been delivered?
-WAIT_TIME = 100
+WAIT_TIME = 200
 
 exports.initIntegrationTests = ->
 
