@@ -1,23 +1,24 @@
 
 Q = require "q"
-Producer = require("./common").Module
 merge = require "deepmerge"
 
+Producer = require("./common").Module
+
 class StompProducer extends Producer
+  constructor: (options) ->
+    Producer.call @, options
+
   getHealth: ->
     name: "stomp"
     host: @options.host
     port: @options.port
     inbox: @options.inbox
 
-
 { Stomp } = require "stomp"
 { ReconnectingStomp } = require "./reconnecting-stomp"
 
 # Library #1: stomp
 class NodeStompProducer extends StompProducer
-  constructor: (options) ->
-    Producer.call @, options
 
   start: ->
     deferred = Q.defer()
@@ -64,54 +65,52 @@ NodeStompProducer.publish = (options, push_id, message) ->
     stomp.publish(push_id, message)
     stomp.stop()
 
-# Library #2: stompit
-stompit = require "stompit"
-class StompitProducer extends StompProducer
-  constructor: (options) ->
-    Producer.call @, options
-
-  start: ->
-    deferred = Q.defer()
-    @stomp = stompit.connect host: @options.host, port: @options.port, =>
-      @_onConnected()
-      deferred.resolve()
-    deferred.promise
-
-  stop: ->
-    Q.try =>
-      @stomp.disconnect()
-
-  _onConnected: =>
-    @stomp.subscribe { destination: @options.inbox }, @_onMessage
-    @logger.info "STOMP connected: %s:%s%s", @options.host, @options.port, @options.inbox
-
-  _onMessage: (message) =>
-    body = ""
-    message.on "data", (data) ->
-      body += data.toString("utf-8")
-    message.on "end", =>
-      push_id = message.headers.push_id
-      @logger.debug "STOMP receive push_id=%s message=%s", push_id, body
-      @subscriptions.emit push_id, body
-
-  publish: (push_id, message) ->
-    frame = @stomp.send(
-      destination: @options.inbox
-      push_id: push_id
-      persistent: false
-    )
-    Q.ninvoke(frame, "end", message)
-
-StompitProducer.publish = (options, push_id, message) ->
-  console.log "options", options
-  stomp = new StompitProducer options
-  stomp.start().then ->
-    stomp.publish(push_id, message)
-  .then ->
-    stomp.stop()
-
-# Default to one of the two:
 StompProducer = NodeStompProducer
+
+# Library #2: stompit
+# stompit = require "stompit"
+# class StompitProducer extends StompProducer
+
+#   start: ->
+#     deferred = Q.defer()
+#     @stomp = stompit.connect host: @options.host, port: @options.port, =>
+#       @_onConnected()
+#       deferred.resolve()
+#     deferred.promise
+
+#   stop: ->
+#     Q.try =>
+#       @stomp.disconnect()
+
+#   _onConnected: =>
+#     @stomp.subscribe { destination: @options.inbox }, @_onMessage
+#     @logger.info "STOMP connected: %s:%s%s", @options.host, @options.port, @options.inbox
+
+#   _onMessage: (message) =>
+#     body = ""
+#     message.on "data", (data) ->
+#       body += data.toString("utf-8")
+#     message.on "end", =>
+#       push_id = message.headers.push_id
+#       @logger.debug "STOMP receive push_id=%s message=%s", push_id, body
+#       @subscriptions.emit push_id, body
+
+#   publish: (push_id, message) ->
+#     frame = @stomp.send(
+#       destination: @options.inbox
+#       push_id: push_id
+#       persistent: false
+#     )
+#     Q.ninvoke(frame, "end", message)
+
+# StompitProducer.publish = (options, push_id, message) ->
+#   console.log "options", options
+#   stomp = new StompitProducer options
+#   stomp.start().then ->
+#     stomp.publish(push_id, message)
+#   .then ->
+#     stomp.stop()
+
 # StompProducer = StompitProducer
 
 module.exports = { Producer, StompProducer }

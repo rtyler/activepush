@@ -1,5 +1,6 @@
 
 Q = require "q"
+
 Consumer = require("./common").Module
 
 socket_io = require "socket.io"

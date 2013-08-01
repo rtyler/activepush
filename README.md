@@ -57,9 +57,17 @@ ActivePush makes extensive use of "promises" (specifically Q promises, which are
 
     npm test
 
+Or:
+
+    mocha --compilers coffee:coffee-script test
+
 The integration tests assume a STOMP broker is running on `localhost:61613`. ActiveMQ can be started with the following command:
 
     activemq start broker:stomp://localhost:61613
+
+They also assume Selenium/WebDriver is running on `localhost:4444`. If you want to disable the WebDriver tests (they are significantly slower) comment out the last line of `test/integration-webdriver.coffee`, or run:
+
+    mocha --compilers coffee:coffee-script test/integration-socketio-client.coffee
 
 `integration-common.coffee` implements the logic of the tests while `integration-socketio-client.coffee` and `integration-webdriver.coffee` implement a common API to create either an in-process `socket.io-client` or a remote WebDriver instance running the demo.html page (which stores messages it receives in `window.messages` for introspection by the test)
 
