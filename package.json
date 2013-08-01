@@ -2,9 +2,9 @@
   "name": "activepush",
   "version": "0.0.0",
   "description": "",
-  "main": "index.coffee",
+  "main": "activepush.coffee",
   "scripts": {
-    "start": "node_modules/.bin/coffee index.coffee",
+    "start": "node_modules/.bin/coffee activepush.coffee",
     "test": "node_modules/.bin/mocha --compilers coffee:coffee-script test"
   },
   "repository": "git://github.com:lookout/activepush.git",
@@ -30,7 +30,8 @@
     "q-proxy": "0.0.1",
     "node-uuid": "~1.4.0",
     "socket.io-client": "~0.9.16",
-    "wd": "0.0.33"
+    "wd": "0.0.33",
+    "node-dev": "latest"
   },
   "private": true
 }

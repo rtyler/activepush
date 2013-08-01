@@ -9,7 +9,7 @@ merge = require "deepmerge"
 uuid = require "node-uuid"
 QStep = require "q-step"
 
-activepush = require "../index"
+activepush = require "../activepush"
 { ActivePush } = activepush
 
 TIMEOUT = 20000
