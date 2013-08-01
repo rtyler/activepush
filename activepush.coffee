@@ -1,42 +1,20 @@
 
-http = require "http"
-{ EventEmitter } = require "events"
 Q = require "q"
-
+http = require "http"
 express = require "express"
-logger = require "winston"
+winston = require "winston"
 
-config = exports.config = require "./lib/config"
+{ SubscriptionBroker } = require "./lib/subscription-broker"
 { SocketIOConsumer } = require "./lib/consumers"
 { StompProducer } = require "./lib/producers"
 
-class SubscriptionBroker extends EventEmitter
-  constructor: ->
-    EventEmitter.call @
-    @messageCount = 0
-  emit: ->
-    @messageCount++
-    EventEmitter::emit.apply @, arguments
+config = exports.config = require "./lib/config"
 
-  getHealth: ->
-    health =
-      name: "subscriptions"
-      push_ids: {}
-      subscriptions: 0
-      messages: @messageCount
-    for name, value of @_events
-      count = if Array.isArray(value) then value.length else 1
-      health.push_ids[name] = count
-      health.total += count
-    health
-
-class ActivePush
+class exports.ActivePush
   constructor: (config) ->
     @config = config
 
-  start: ->
-
-    @logger = logger
+    @logger = @config.logger or winston
     # Configure logging
     if @config.logging.file
       @logger.remove logger.transports.Console
@@ -44,6 +22,7 @@ class ActivePush
         filename: @config.logging.file
     @logger.level = (@config.logging.level or "info").toLowerCase()
 
+  start: ->
     @subscriptions = new SubscriptionBroker()
 
     # Create STOMP producer
@@ -62,15 +41,11 @@ class ActivePush
       subscriptions: @subscriptions
       port: @config.http.port
 
-    # Health endpoint
-    @app.get "/health", @_healthEndpoint
-
-    # Demo page and sending endpoint.
-    @app.get "/", (req, res) ->
-      res.sendfile "#{__dirname}/demo.html"
-    @app.post "/send", express.json(), (req, res) =>
-      @producer.publish req.body.push_id, req.body.message
-      res.send 200
+    @_initializePrivateEndpoints(@app)
+    # Put these on another port by doing the following:
+    # privateApp = express()
+    # privateApp.listen(@config.http.port + 1)
+    # @_initializePrivateEndpoints(privateApp)
 
     Q.all([
       @consumer.start()
@@ -84,6 +59,17 @@ class ActivePush
       @producer.stop()
     ])
 
+  _initializePrivateEndpoints: (app) ->
+    # Health endpoint
+    @app.get "/health", @_healthEndpoint
+
+    # Demo page and sending endpoint.
+    @app.get "/", (req, res) ->
+      res.sendfile "#{__dirname}/demo.html"
+    @app.post "/send", express.json(), (req, res) =>
+      @producer.publish req.body.push_id, req.body.message
+      res.send 200
+
   _healthEndpoint: (req, res) =>
     health =
       log:
@@ -96,12 +82,11 @@ class ActivePush
       delete object.name
     res.json health
 
-exports.ActivePush = ActivePush
-
 exports.main = (args) ->
-  activepush = new ActivePush(config.loadConfiguration(args[0]))
+  configuration = config.loadConfiguration(args[0])
+  activepush = new exports.ActivePush(configuration)
   activepush.start().then ->
-    activepush.logger.info "Ready..."
+    activepush.logger.info "Started with environment: #{activepush.config.environment}"
     process.on "SIGINT", ->
       activepush.logger.info "Shutting down..."
       activepush.stop().then ->

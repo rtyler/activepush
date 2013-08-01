@@ -37,6 +37,6 @@ class SocketIOConsumer extends Consumer
 
   getHealth: ->
     name: "socketio"
-    count: @io.sockets.clients().length
+    clients: @io.sockets.clients().length
 
 module.exports = { Consumer, SocketIOConsumer }

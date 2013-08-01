@@ -3,16 +3,27 @@ Q = require "q"
 Producer = require("./common").Module
 merge = require "deepmerge"
 
-# Library #1: stomp
+class StompProducer extends Producer
+  getHealth: ->
+    name: "stomp"
+    host: @options.host
+    port: @options.port
+    inbox: @options.inbox
+
+
 { Stomp } = require "stomp"
-class NodeStompProducer extends Producer
+{ ReconnectingStomp } = require "./reconnecting-stomp"
+
+# Library #1: stomp
+class NodeStompProducer extends StompProducer
   constructor: (options) ->
     Producer.call @, options
 
   start: ->
     deferred = Q.defer()
-    @stomp = new Stomp merge(@options.host, debug: true)
-    # stomp = new ReconnectingStomp host
+    options = merge(@options.host, debug: false)
+    # @stomp = new Stomp options
+    @stomp = new ReconnectingStomp options
     @stomp.connect()
     @stomp.on "connected", =>
       @_onConnected()
@@ -53,42 +64,9 @@ NodeStompProducer.publish = (options, push_id, message) ->
     stomp.publish(push_id, message)
     stomp.stop()
 
-# # Subclass of Stomp that automatically tries to reconnect, similar options to Ruby STOMP gem
-# class ReconnectingStomp extends Stomp
-#   constructor: (args) ->
-#     Stomp.call @, args
-
-#     @initial_reconnect_delay  = args.initial_reconnect_delay or 1
-#     @max_reconnect_delay      = args.max_reconnect_delay or 30.0
-#     @use_exponential_back_off = if args.use_exponential_back_off? then args.use_exponential_back_off else true
-#     @back_off_multiplier      = args.back_off_multiplier or 2
-#     @max_reconnect_attempts   = args.max_reconnect_attempts or 0
-
-#     @_resetReconnection()
-#     @on "connected", @_resetReconnection
-#     @on "disconnected", @_reconnect
-
-#   _reconnect: =>
-#     if @reconnectTimer?
-#       return
-#     if @max_reconnect_attempts > 0 and @reconnectCount >= @max_reconnect_attempts
-#       return
-#     if @use_exponential_back_off
-#       @reconnectDelay = Math.min(@max_reconnect_delay * 1000, @reconnectDelay * @back_off_multiplier)
-#     @reconnectTimer = setTimeout =>
-#       @max_reconnect_attempts++
-#       @connect()
-#       delete @reconnectTimer
-#     , @reconnectDelay
-
-#   _resetReconnection: =>
-#     @reconnectCount = 0
-#     @reconnectTimer = null
-#     @reconnectDelay = @initial_reconnect_delay * 1000
-
 # Library #2: stompit
 stompit = require "stompit"
-class StompitProducer extends Producer
+class StompitProducer extends StompProducer
   constructor: (options) ->
     Producer.call @, options
 
@@ -115,12 +93,6 @@ class StompitProducer extends Producer
       push_id = message.headers.push_id
       @logger.debug "STOMP receive push_id=%s message=%s", push_id, body
       @subscriptions.emit push_id, body
-
-  getHealth: ->
-    name: "stomp"
-    host: @options.host
-    port: @options.port
-    inbox: @options.inbox
 
   publish: (push_id, message) ->
     frame = @stomp.send(
