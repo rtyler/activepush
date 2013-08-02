@@ -1,0 +1,154 @@
+<!doctype html>
+<!-- The Time Machine GitHub pages theme was designed and developed by Jon Rohan, on Feb 7, 2012. -->
+<!-- Follow him for fun. http://twitter.com/jonrohan. Tail his code on http://github.com/jonrohan -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+  <link rel="stylesheet" href="stylesheets/stylesheet.css" media="screen"/>
+  <link rel="stylesheet" href="stylesheets/pygment_trac.css"/>
+  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+  <script type="text/javascript" src="javascripts/script.js"></script>
+
+  <title>Activepush</title>
+  <meta name="description" content="A socket.io push service built around ActiveMQ">
+
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+</head>
+
+<body>
+
+  <div class="wrapper">
+    <header>
+      <h1 class="title">Activepush</h1>
+    </header>
+    <div id="container">
+      <p class="tagline">A socket.io push service built around ActiveMQ</p>
+      <div id="main" role="main">
+        <div class="download-bar">
+        <div class="inner">
+          <a href="https://github.com/lookout/activepush/tarball/master" class="download-button tar"><span>Download</span></a>
+          <a href="https://github.com/lookout/activepush/zipball/master" class="download-button zip"><span>Download</span></a>
+          <a href="https://github.com/lookout/activepush" class="code">View Activepush on GitHub</a>
+        </div>
+        <span class="blc"></span><span class="trc"></span>
+        </div>
+        <article class="markdown-body">
+          <p>Web push service built around ActiveMQ (or any STOMP broker).</p>
+
+<p>ActivePush subscribes to a STOMP broker and relays messages with a specific <code>push_id</code> header to subscribed Socket.io clients. The message bodies are opaque to ActivePush, so the service is useful in a variety of applications.</p>
+
+<h2>
+<a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h2>
+
+<p>Production:</p>
+
+<pre><code>npm install
+bin/activepush [environment]
+</code></pre>
+
+<p>Development:</p>
+
+<pre><code>npm install -d
+bin/activepush
+</code></pre>
+
+<p>Or, to auto-reload on changes:</p>
+
+<pre><code>node-dev activepush.coffee
+</code></pre>
+
+<p>The optional <code>environment</code> argument corresponds to a configuration file in <code>configure</code>, which defaults to <code>development</code> and overrides values in the "default.yml" configuration file.</p>
+
+<p>By default ActivePush expects a STOMP broker (e.x. ActiveMQ) to be running on <code>localhost:61613</code>.</p>
+
+<p>If ActiveMQ is installed you can start it with the following command:</p>
+
+<pre><code>activemq start broker:stomp://localhost:61613
+</code></pre>
+
+<h2>
+<a name="configuration" class="anchor" href="#configuration"><span class="octicon octicon-link"></span></a>Configuration</h2>
+
+<p>Configuration files are located in the <code>config</code> directory. <code>default.yml</code> is loaded first, and an environment-specific configuration (defaulting to <code>development.yml</code>) overrides the defaults.</p>
+
+<p>The environment can be specified as the first argument the the <code>activepush</code> executable, or in the <code>NODE_ENV</code> environment variable.</p>
+
+<h2>
+<a name="production" class="anchor" href="#production"><span class="octicon octicon-link"></span></a>Production</h2>
+
+<p>All HTTP endpoints except those under the "/socket.io" URL should not be exposed externally as they could expose private information (e.g. "/health") or capabilities (e.g. "/send"). Alternatively, those endpoints could easily be moved to a separate port (see commented out code in the <code>start</code> method of ActivePush)</p>
+
+<p>Multiple instances of ActivePush can be load-balanced, keeping the following in mind:</p>
+
+<ul>
+<li>A STOMP message bus rather than a queue should be used to ensure all instances recieve all messages</li>
+<li>Socket.io needs clients to be "pinned" to the same backend across multiple requests (perhaps using cookies or the source IP address), in particular for the XHR polling transport.</li>
+</ul><h2>
+<a name="architecture" class="anchor" href="#architecture"><span class="octicon octicon-link"></span></a>Architecture</h2>
+
+<p>The ActivePush class in <code>activepush.coffee</code> creates the server using the StompProducer and SocketIOConsumer. This could be made configurable, or even support multiple simultaneous producer/consumers.</p>
+
+<p>The STOMP and WebSocket components are implemented in <code>consumers.coffee</code> and <code>producers.coffee</code>, respectively. Other producers/consumers could be implemented.</p>
+
+<p>The producer/consumer components share a SubscriptionBroker <code>subscriptions</code> object, which is essentially an EventEmitter they can listen or emit <code>push_id</code> events to.</p>
+
+<p>ActivePush makes extensive use of "promises" (specifically Q promises, which are compatible with the Promises/A+ standard) in both the application and tests.</p>
+
+<h2>
+<a name="testing" class="anchor" href="#testing"><span class="octicon octicon-link"></span></a>Testing</h2>
+
+<pre><code>npm test
+</code></pre>
+
+<p>Or:</p>
+
+<pre><code>mocha --compilers coffee:coffee-script test
+</code></pre>
+
+<p>The integration tests assume a STOMP broker is running on <code>localhost:61613</code>. ActiveMQ can be started with the following command:</p>
+
+<pre><code>activemq start broker:stomp://localhost:61613
+</code></pre>
+
+<p>They also assume Selenium/WebDriver is running on <code>localhost:4444</code>. If you want to disable the WebDriver tests (they are significantly slower) comment out the last line of <code>test/integration-webdriver.coffee</code>, or run:</p>
+
+<pre><code>mocha --compilers coffee:coffee-script test/integration-socketio-client.coffee
+</code></pre>
+
+<p><code>integration-common.coffee</code> implements the logic of the tests while <code>integration-socketio-client.coffee</code> and <code>integration-webdriver.coffee</code> implement a common API to create either an in-process <code>socket.io-client</code> or a remote WebDriver instance running the demo.html page (which stores messages it receives in <code>window.messages</code> for introspection by the test)</p>
+
+<p>Unfortunately there is no easy way to tell when all messages have propagated from the running test to the ActiveMQ queue back to the ActivePush server and through the Socket.io client, so we currently have short delays before testing that messages have been received. This leads to occasional non-deterministic test failures. Increasing the delays reduces the frequency at a cost of longer running tests.</p>
+
+<h2>
+<a name="contributors" class="anchor" href="#contributors"><span class="octicon octicon-link"></span></a>Contributors</h2>
+
+<ul>
+<li>Tom Robinson <a href="mailto:tlrobinson@gmail.com">tlrobinson@gmail.com</a>
+</li>
+</ul>
+        </article>
+      </div>
+    </div>
+    <footer>
+      <div class="owner">
+      <p><a href="https://github.com/lookout" class="avatar"><img src="https://secure.gravatar.com/avatar/ee9f2b5fc43be14aedb09b84b30c5a2c?s=30&amp;d=https://a248.e.akamai.net/assets.github.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png" width="48" height="48"/></a> <a href="https://github.com/lookout">lookout</a> maintains <a href="https://github.com/lookout/activepush">Activepush</a></p>
+
+
+      </div>
+      <div class="creds">
+        <small>This page generated using <a href="https://pages.github.com/">GitHub Pages</a><br/>theme by <a href="https://twitter.com/jonrohan/">Jon Rohan</a></small>
+      </div>
+    </footer>
+  </div>
+  <div class="current-section">
+    <a href="#top">Scroll to top</a>
+    <a href="https://github.com/lookout/activepush/tarball/master" class="tar">tar</a><a href="https://github.com/lookout/activepush/zipball/master" class="zip">zip</a><a href="" class="code">source code</a>
+    <p class="name"></p>
+  </div>
+
+  
+</body>
+</html>
