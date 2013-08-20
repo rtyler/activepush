@@ -1,7 +1,7 @@
 {
   "name": "activepush",
-  "version": "0.0.0",
-  "description": "",
+  "version": "1.0.0",
+  "description": "Web push service built around ActiveMQ (or any STOMP broker)",
   "main": "activepush.coffee",
   "scripts": {
     "start": "node_modules/.bin/coffee activepush.coffee",
@@ -32,6 +32,5 @@
     "socket.io-client": "~0.9.16",
     "wd": "0.0.33",
     "node-dev": "latest"
-  },
-  "private": true
+  }
 }
