@@ -3,6 +3,7 @@ Q = require "q"
 http = require "http"
 express = require "express"
 winston = require "winston"
+optimist = require "optimist"
 
 { SubscriptionBroker } = require "./lib/subscription-broker"
 { SocketIOConsumer } = require "./lib/consumers"
@@ -82,8 +83,27 @@ class exports.ActivePush
       delete object.name
     res.json health
 
-exports.main = (args) ->
-  configuration = config.loadConfiguration(args[0])
+exports.main = ->
+  options = optimist
+    .usage("Start ActivePush server.\nUsage: activepush [OPTIONS] [ENVIRONMENT]")
+    .boolean(["h", "v"])
+    .alias("c", "config")
+    .describe("c", "Specify a configuration file")
+    .alias("h", "help")
+    .describe("h", "Show command line options and exit")
+    .alias("v", "version")
+    .describe("v", "Show version and exit")
+
+  if options.argv.help
+    options.showHelp()
+    process.exit()
+  if options.argv.version
+    console.log "v" + require("#{__dirname}/package.json").version
+    process.exit()
+
+  configName = options.argv.config or options.argv._[0]
+
+  configuration = config.loadConfiguration(configName)
   activepush = new exports.ActivePush(configuration)
   activepush.start().then ->
     activepush.logger.info "Started with environment: #{activepush.config.environment}"
@@ -92,6 +112,7 @@ exports.main = (args) ->
       activepush.stop().then ->
         process.exit(1)
       .done()
+  .done()
 
 if require.main is module
-  exports.main(process.argv[2..]).done()
+  exports.main()
