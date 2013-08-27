@@ -1,6 +1,6 @@
 {
   "name": "activepush",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Web push service built around ActiveMQ (or any STOMP broker)",
   "main": "activepush.coffee",
   "bin": {
@@ -15,6 +15,7 @@
   "author": "Lookout (https://www.lookout.com/)",
   "license": "MIT",
   "dependencies": {
+    "q": "~0.9.6",
     "coffee-script": "~1.6.3",
     "socket.io": "~0.9.16",
     "stomp": "~0.1.1",
