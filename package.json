@@ -1,8 +1,12 @@
 {
   "name": "activepush",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Web push service built around ActiveMQ (or any STOMP broker)",
   "main": "activepush.coffee",
+  "bin": {
+    "activepush": "./bin/activepush",
+    "activepush-client-example": "./bin/example-client"
+  },
   "scripts": {
     "start": "node_modules/.bin/coffee activepush.coffee",
     "test": "node_modules/.bin/mocha --compilers coffee:coffee-script test"
