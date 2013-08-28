@@ -18,8 +18,8 @@ class exports.ActivePush
     @logger = @config.logger or winston
     # Configure logging
     if @config.logging.file
-      @logger.remove logger.transports.Console
-      @logger.add logger.transports.File,
+      @logger.remove @logger.transports.Console
+      @logger.add @logger.transports.File,
         filename: @config.logging.file
     @logger.level = (@config.logging.level or "info").toLowerCase()
 
