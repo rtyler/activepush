@@ -33,6 +33,8 @@ class exports.ActivePush
       inbox: @config.stomp.inbox
       host: @config.stomp.hosts[0].host
       port: @config.stomp.hosts[0].port
+      login: @config.stomp.hosts[0].login
+      passcode: @config.stomp.hosts[0].passcode
 
     # Create Socket.io consumer
     @app = express()

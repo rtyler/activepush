@@ -22,7 +22,7 @@ class NodeStompProducer extends StompProducer
 
   start: ->
     deferred = Q.defer()
-    options = merge(@options.host, debug: false)
+    options = merge(@options, debug: false)
     # @stomp = new Stomp options
     @stomp = new ReconnectingStomp options
     @stomp.connect()
