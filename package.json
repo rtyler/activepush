@@ -1,6 +1,6 @@
 {
   "name": "activepush",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Web push service built around ActiveMQ (or any STOMP broker)",
   "main": "activepush.coffee",
   "bin": {
